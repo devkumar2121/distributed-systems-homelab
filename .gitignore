@@ -1,0 +1,117 @@
+# Go to root folder
+cd ~/distributed-systems-homelab
+
+# Create .gitignore
+cat > .gitignore << 'EOF'
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Environment Variables
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# NEVER commit real .env files
+# They contain passwords and secrets
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Node.js Dependencies
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Never push node_modules
+# Run npm install to recreate
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Mac System Files
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Logs
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+logs/
+*.log
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Editor Files
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+.vscode/
+.idea/
+*.swp
+*.swo
+
+EOF
+```
+
+---
+
+## What Each Section Does
+
+### Section 1 — Environment Variables
+```
+.env               ← your actual passwords
+.env.local         ← local overrides
+.env.development   ← dev environment
+.env.production    ← production secrets
+.env.test          ← test environment
+
+All ignored ✅
+Only .env.example
+goes to GitHub ✅
+```
+
+---
+
+### Section 2 — Node Modules
+```
+node_modules/  ← all day folders covered
+               day1-zomato/node_modules ❌
+               day2-upi/node_modules    ❌
+               day3-whatsapp/node_modules❌
+
+npm-debug.log  ← npm error logs
+yarn-debug.log ← yarn error logs
+```
+
+---
+
+### Section 3 — Mac System Files
+```
+.DS_Store   ← Mac folder settings
+             (created automatically
+              by Mac Finder)
+             Very annoying on GitHub
+             Always ignore this ✅
+```
+
+---
+
+### Section 4 — Logs
+```
+logs/   ← any log folders
+*.log   ← any log files
+
+Your simulations may
+generate log files
+All ignored ✅
+```
+
+---
+
+### Section 5 — Editor Files
+```
+.vscode/  ← VS Code settings
+.idea/    ← IntelliJ settings
+*.swp     ← Vim swap files
+*.swo     ← Vim swap files
+
+These are personal
+editor preferences
+Nobody else needs them ✅
