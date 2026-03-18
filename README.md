@@ -37,17 +37,8 @@ Instagram: @distributed.dev
 git clone https://github.com/YOURUSERNAME/distributed-systems-homelab
 
 # Install dependencies
-cd zomato-simulation
+cd day-wise-simulation
 npm install
 
 # Setup .env
 cp .env.example .env
-# Add your Redis details
-
-# Run backend (Ubuntu)
-node zomato.backend.js
-
-# Run customer (Mac)
-node customer.js
-```
-EOF

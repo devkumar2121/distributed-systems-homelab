@@ -1,7 +1,10 @@
 // zomato.backend.js — Ubuntu 🐧
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const { createClient } = require('redis');
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Redis Connection
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const subscriber = createClient({
   socket: {
     host: process.env.REDIS_HOST,
@@ -12,17 +15,217 @@ const subscriber = createClient({
 
 const publisher = subscriber.duplicate();
 
-// Available drivers
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Drivers Pool
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const drivers = [
-  { name: 'Ramesh Kumar', rating: 4.8, eta: '12 mins' },
-  { name: 'Suresh Singh', rating: 4.5, eta: '15 mins' },
-  { name: 'Mahesh Yadav', rating: 4.9, eta: '8 mins'  },
+  {
+    id:        'DRV001',
+    name:      'Ramesh Kumar',
+    rating:    4.8,
+    eta:       '12 mins',
+    vehicle:   'Honda Activa',
+    available: true
+  },
+  {
+    id:        'DRV002',
+    name:      'Suresh Singh',
+    rating:    4.5,
+    eta:       '15 mins',
+    vehicle:   'TVS Jupiter',
+    available: true
+  },
+  {
+    id:        'DRV003',
+    name:      'Mahesh Yadav',
+    rating:    4.9,
+    eta:       '8 mins',
+    vehicle:   'Bajaj Pulsar',
+    available: true
+  },
+  {
+    id:        'DRV004',
+    name:      'Dinesh Sharma',
+    rating:    4.7,
+    eta:       '10 mins',
+    vehicle:   'Honda Shine',
+    available: true
+  },
+  {
+    id:        'DRV005',
+    name:      'Rajesh Verma',
+    rating:    4.6,
+    eta:       '18 mins',
+    vehicle:   'Hero Splendor',
+    available: true
+  },
 ];
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Random Driver Picker
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function pickRandomDriver() {
+
+  // Filter only available drivers
+  const availableDrivers = drivers.filter(
+    driver => driver.available === true
+  );
+
+  // No drivers available
+  if (availableDrivers.length === 0) {
+    return null;
+  }
+
+  // Pick completely random driver
+  // from available pool
+  const randomIndex = Math.floor(
+    Math.random() * availableDrivers.length
+  );
+
+  const selectedDriver = availableDrivers[randomIndex];
+
+  // Mark driver as busy
+  // so same driver not assigned twice
+  const driverInPool = drivers.find(
+    d => d.id === selectedDriver.id
+  );
+  driverInPool.available = false;
+
+  console.log(`\n🔍 Available drivers: ${availableDrivers.length}`);
+  console.log(`✅ Randomly picked: ${selectedDriver.name}`);
+
+  return selectedDriver;
 }
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Free Driver After Delivery
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function freeDriver(driverId) {
+  const driver = drivers.find(d => d.id === driverId);
+  if (driver) {
+    driver.available = true;
+    console.log(`\n🔓 ${driver.name} is available again!`);
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Show All Drivers Status
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function showDriverStatus() {
+  console.log('\n📊 Driver Status:');
+  drivers.forEach(driver => {
+    // Green dot for available or true, red dot for busy or false
+    const status = driver.available
+      ? '🟢 Available'
+      : '🔴 Busy';
+    console.log(
+      `   ${driver.name} → ${status}`
+    );
+  });
+  console.log();
+}
+
+function sleep(ms) {
+  return new Promise(
+    resolve => setTimeout(resolve, ms)
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Process Each Order
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function processOrder(order) {
+  const receivedAt = new Date().toLocaleTimeString();
+
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`[${receivedAt}] 🔔 NEW ORDER!`);
+  console.log(`   Order ID   : ${order.orderId}`);
+  console.log(`   Customer   : ${order.customer}`);
+  console.log(`   Location   : ${order.location}`);
+  console.log(`   Restaurant : ${order.restaurant}`);
+  console.log(`   Items      : ${order.items.join(', ')}`);
+  console.log(`   Amount     : ₹${order.amount}`);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+  // Show current driver status
+  showDriverStatus();
+
+  // Step 1 — Confirm order
+  console.log('⚡ Step 1: Confirming order...');
+  await sleep(1000);
+  console.log(`✅ ${order.restaurant} confirmed!\n`);
+
+  await publisher.publish(
+    'zomato:updates',
+    JSON.stringify({
+      orderId: order.orderId,
+      status:  'ORDER_CONFIRMED',
+      message: `${order.restaurant} confirmed! ✅`
+    })
+  );
+
+  // Step 2 — Pick random driver
+  console.log('⚡ Step 2: Finding nearest driver...');
+  await sleep(2000);
+
+  const driver = pickRandomDriver();
+
+  // No driver available
+  if (!driver) {
+    console.log('❌ No drivers available right now!');
+
+    await publisher.publish(
+      'zomato:updates',
+      JSON.stringify({
+        orderId: order.orderId,
+        status:  'NO_DRIVER',
+        message: 'No drivers available. Please wait... ⏳'
+      })
+    );
+    return;
+  }
+
+  const assignedAt  = new Date().toLocaleTimeString();
+  const totalTime   = (
+    (Date.now() - order.startTime) / 1000
+  ).toFixed(1);
+
+  console.log(`\n✅ Driver assigned!`);
+  console.log(`   Name    : ${driver.name}`);
+  console.log(`   Rating  : ⭐ ${driver.rating}`);
+  console.log(`   Vehicle : ${driver.vehicle}`);
+  console.log(`   ETA     : ${driver.eta}`);
+  console.log(`   Time    : ${assignedAt}`);
+  console.log(`\n🎯 Assignment time: ${totalTime}s\n`);
+
+  await publisher.publish(
+    'zomato:updates',
+    JSON.stringify({
+      orderId:   order.orderId,
+      status:    'DRIVER_ASSIGNED 🎉',
+      message:   `${driver.name} is heading your way!`,
+      driver: {
+        name:    driver.name,
+        rating:  driver.rating,
+        vehicle: driver.vehicle,
+      },
+      eta:       driver.eta,
+      totalTime: `${totalTime} seconds`
+    })
+  );
+
+  // Step 3 — Simulate delivery
+  // then free driver
+  await sleep(5000);
+  freeDriver(driver.id);
+
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('⏳ Ready for next order...\n');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Start Backend
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 async function startBackend() {
   await subscriber.connect();
   await publisher.connect();
@@ -30,192 +233,105 @@ async function startBackend() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('🏢 Zomato Backend — Ubuntu 🐧');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`✅ ${drivers.length} drivers ready`);
+
+  showDriverStatus();
+
   console.log('⏳ Waiting for orders...\n');
 
   await subscriber.subscribe(
     'zomato:orders',
     async (message) => {
       const order = JSON.parse(message);
-      const receivedAt = new Date().toLocaleTimeString();
-
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(`[${receivedAt}] 🔔 NEW ORDER!`);
-      console.log(`   From    : ${order.customer}`);
-      console.log(`   Place   : ${order.restaurant}`);
-      console.log(`   Amount  : ₹${order.amount}`);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-
-      // Step 1 — Confirm order (1 second)
-      console.log('⚡ Step 1: Confirming order...');
-      await sleep(1000);
-      console.log('✅ Order confirmed!\n');
-
-      await publisher.publish(
-        'zomato:updates',
-        JSON.stringify({
-          orderId: order.orderId,
-          status: 'ORDER_CONFIRMED',
-          message: `${order.restaurant} confirmed! ✅`
-        })
-      );
-
-      // Step 2 — Assign driver (2 seconds)
-      console.log('⚡ Step 2: Finding nearest driver...');
-      await sleep(2000);
-
-      // Pick best rated driver
-      const driver = drivers.reduce((best, d) =>
-        d.rating > best.rating ? d : best
-      );
-
-      const assignedAt = new Date().toLocaleTimeString();
-      const totalTime = (Date.now() - order.startTime) / 1000;
-
-      console.log(`✅ Driver assigned: ${driver.name}`);
-      console.log(`   Rating  : ⭐ ${driver.rating}`);
-      console.log(`   ETA     : ${driver.eta}`);
-      console.log(`   Time    : ${assignedAt}`);
-      console.log(`\n🎯 Total assignment time: ${totalTime}s\n`);
-
-      await publisher.publish(
-        'zomato:updates',
-        JSON.stringify({
-          orderId: order.orderId,
-          status: 'DRIVER_ASSIGNED 🎉',
-          message: `${driver.name} is on the way!`,
-          driver: {
-            name: driver.name,
-            rating: driver.rating,
-          },
-          eta: driver.eta,
-          totalTime: `${totalTime} seconds`
-        })
-      );
-
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('⏳ Ready for next order...\n');
+      await processOrder(order);
     }
   );
 }
 
 startBackend().catch(console.error);
-```
 
 // ---
 
-// ## The Perfect Output For Instagram
+// ## How Random Driver Picker Works
+// ```
+// drivers pool:
+// [Ramesh, Suresh, Mahesh, Dinesh, Rajesh]
+// All available = true
+//         │
+//         ▼
+// Order comes in
+//         │
+//         ▼
+// Filter available drivers only:
+// [Ramesh, Suresh, Mahesh, Dinesh, Rajesh]
+//         │
+//         ▼
+// Pick random index:
+// Math.random() * 5 = 2
+// → Mahesh selected! 🎯
+//         │
+//         ▼
+// Mark Mahesh as busy:
+// available = false
+//         │
+//         ▼
+// Next order comes:
+// [Ramesh, Suresh, Dinesh, Rajesh]
+// Mahesh excluded ✅
+//         │
+//         ▼
+// After delivery:
+// Mahesh available = true again ✅
+// ```
 
-// ### Ubuntu screen shows:
+// ---
+
+// ## The Output You Will See
 // ```
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 🏢 Zomato Backend — Ubuntu 🐧
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ✅ 5 drivers ready
+
+// 📊 Driver Status:
+//    Ramesh Kumar → 🟢 Available
+//    Suresh Singh → 🟢 Available
+//    Mahesh Yadav → 🟢 Available
+//    Dinesh Sharma→ 🟢 Available
+//    Rajesh Verma → 🟢 Available
+
 // ⏳ Waiting for orders...
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // [10:30:00] 🔔 NEW ORDER!
-//    From    : Rahul
-//    Place   : Burger King
-//    Amount  : ₹450
+//    Customer   : Priya
+//    Restaurant : KFC
+//    Amount     : ₹342
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// 📊 Driver Status:
+//    Ramesh Kumar → 🟢 Available
+//    Suresh Singh → 🟢 Available
+//    Mahesh Yadav → 🟢 Available
+//    Dinesh Sharma→ 🟢 Available
+//    Rajesh Verma → 🟢 Available
 
 // ⚡ Step 1: Confirming order...
-// ✅ Order confirmed!
+// ✅ KFC confirmed!
 
 // ⚡ Step 2: Finding nearest driver...
-// ✅ Driver assigned: Mahesh Yadav
-//    Rating  : ⭐ 4.9
-//    ETA     : 8 mins
-//    Time    : 10:30:03
 
-// 🎯 Total assignment time: 3.2s
+// 🔍 Available drivers: 5
+// ✅ Randomly picked: Dinesh Sharma
+
+// ✅ Driver assigned!
+//    Name    : Dinesh Sharma
+//    Rating  : ⭐ 4.7
+//    Vehicle : Honda Shine
+//    ETA     : 10 mins
+
+// 🎯 Assignment time: 3.1s
+
+// 🔓 Dinesh Sharma is available again!
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ```
-
-// ### Mac screen shows:
-// ```
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 📱 Zomato App — Mac 🍎
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-// 🍕 Placing order...
-//    Order ID   : ORD1234567
-//    Restaurant : Burger King
-//    Items      : Whopper, Fries
-//    Amount     : ₹450
-//    Time       : 10:30:00
-
-// ✅ Order sent!
-// ⏳ Waiting for driver...
-
-// [10:30:01] 🔔 ORDER_CONFIRMED
-//            Burger King confirmed! ✅
-
-// [10:30:03] 🔔 DRIVER_ASSIGNED 🎉
-//            Mahesh Yadav is on the way!
-
-//            🛵 Driver : Mahesh Yadav
-//            ⭐ Rating : 4.9
-//            ⏱️  ETA    : 8 mins
-// ```
-
-// **This is exactly what you post! 🔥**
-
-// ---
-
-// ## Your Day 1 Slide Content
-// ```
-// Slide 1 — Hook:
-// "How Zomato assigns your
-//  delivery partner in
-//  under 10 seconds 🍕"
-
-// Slide 2 — The Problem:
-// "1 lakh orders during lunch rush
-//  Every order needs a driver
-//  assigned in under 10 seconds
-//  How is this possible? 🤯"
-
-// Slide 3 — The Architecture:
-// Simple diagram:
-// Mac (Customer) → Redis → Ubuntu (Backend)
-
-// Slide 4 — Mac Terminal:
-// Screenshot of customer.js running
-// Order being placed
-
-// Slide 5 — Ubuntu Terminal:
-// Screenshot of backend running
-// Driver being assigned
-
-// Slide 6 — Split Screen:
-// Both terminals visible
-// Order flowing between them
-
-// Slide 7 — The Timer:
-// "Total assignment time: 3.2s ⚡
-//  Under 10 seconds ✅"
-
-// Slide 8 — Key Learning:
-// "Redis Pub/Sub =
-//  Instant communication
-//  between machines
-//  No polling. No waiting.
-//  Pure real time. 🔥"
-
-// Slide 9 — CTA:
-// "Tomorrow I show what happens
-//  when the driver goes offline
-//  mid delivery 😱
-//  Follow to see it 👀"
-// ```
-
-// ---
-
-// ## Run It Right Now
-// ```
-// Step 1 → Create simplified files
-// Step 2 → Ubuntu: node zomato.backend.js
-// Step 3 → Mac: node customer.js
-// Step 4 → Screen record both terminals
-// Step 5 → Post tonight! 🚀
+// ⏳ Ready for next order...
