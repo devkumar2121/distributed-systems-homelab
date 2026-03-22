@@ -332,7 +332,3 @@ node customer.js
 New simulation every Mon • Wed • Fri 🗓️
 
 ---
-
-## License
-
-MIT — Learn freely 🚀

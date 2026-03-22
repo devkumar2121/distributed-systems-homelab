@@ -122,7 +122,6 @@ async function startCustomerApp() {
     if (update.totalTime) {
       console.log(`         ⚡ Time   : ${update.totalTime}`);
     }
-
     console.log();
   });
 
